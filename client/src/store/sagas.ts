@@ -1,6 +1,5 @@
 import { takeEvery } from "redux-saga/effects";
 import {
-  JsonRpcProvider,
   Transaction,
   TransactionResponse,
   TransactionReceipt,
@@ -9,31 +8,21 @@ import {
 } from "ethers";
 
 import apolloClient from "../apollo/client";
-import { Actions } from "../types";
+import { Action, Actions, SendTransactionPayload } from "../types";
 import { SaveTransaction } from "../queries";
 import { navigate } from "../components/NaiveRouter";
 
-function* sendTransaction() {
-  const provider = new JsonRpcProvider("http://localhost:8545");
-
+function* sendTransaction({ payload }: Action<SendTransactionPayload>) {
   // this could have been passed along in a more elegant fashion,
   // but for the purpouses of this scenario it's good enough
   // @ts-ignore
   const walletProvider = new BrowserProvider(window.ethereum); // Had issues with MetaMask connection, and since web3.currentProvider is deprecated, I ethereum as per error messages.
 
   const signer: Signer = yield walletProvider.getSigner();
-  const accounts: Array<{ address: string }> = yield provider.listAccounts();
-
-  const randomAddress = () => {
-    const min = 1;
-    const max = 19;
-    const random = Math.round(Math.random() * (max - min) + min);
-    return accounts[random].address;
-  };
 
   const transaction = {
-    to: randomAddress(),
-    value: BigInt(1000000000000000000), // Unless casted, results in integer overflow.
+    to: payload.recipient,
+    value: BigInt(payload.amount), // Unless casted, results in integer overflow.
   };
 
   try {
@@ -61,6 +50,8 @@ function* sendTransaction() {
       mutation: SaveTransaction,
       variables,
     });
+    // Close modal and reset form
+    document.getElementById("close-modal-button")?.click();
 
     navigate(`/transaction/${receipt.hash}`);
   } catch (error) {
